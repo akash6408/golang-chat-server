@@ -1,5 +1,5 @@
 # Use official Go image
-FROM golang:1.25
+FROM golang:1.23 AS builder
 
 WORKDIR /app
 
@@ -11,10 +11,10 @@ RUN go mod download
 COPY . .
 
 # Build the Go server binary
-RUN go build -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./cmd/server
 
 # Expose app port
 EXPOSE 8080
 
 # Run the server
-CMD ["./cmd/server/main.go"]
+CMD ["./server"]

@@ -56,8 +56,8 @@ services:
         condition: service_healthy
     networks:
       - backend-net
-    volumes:
-      - .:/app
+    # volumes:
+    #   - .:/app
 
 volumes:
   pgdata:
