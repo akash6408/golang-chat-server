@@ -1,15 +1,14 @@
 package config
 
 import (
-	"flag"
 	"log"
-	"os"
 
 	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/joho/godotenv"
 )
 
 type HTTPServer struct {
-	Address string
+	Address string `yaml:"address" env:"HTTP_ADDRESS"`
 }
 
 type DBConfig struct {
@@ -35,31 +34,17 @@ type Config struct {
 }
 
 func MustLoad() *Config {
-	var configPath string
+	// Load variables from .env if present (non-fatal if missing)
+	_ = godotenv.Load()
 
-	configPath = os.Getenv("CONFIG_PATH")
-
-	if configPath == "" {
-		flags := flag.String("config", "", "path to the configuration file")
-		flag.Parse()
-
-		configPath = *flags
-
-		if configPath == "" {
-			log.Fatal("Config path is not set")
-		}
-	}
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		log.Fatalf("config file does not exist: %s", configPath)
-	}
-
+	// Read configuration strictly from environment variables
 	var cfg Config
+	if err := cleanenv.ReadEnv(&cfg); err != nil {
+		log.Fatalf("can not read env: %s", err.Error())
+	}
 
-	err := cleanenv.ReadConfig(configPath, &cfg)
-
-	if err != nil {
-		log.Fatalf("can not read config file: %s", err.Error())
+	if cfg.Env == "" {
+		cfg.Env = "dev"
 	}
 
 	return &cfg

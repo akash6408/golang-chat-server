@@ -34,6 +34,31 @@ services:
     networks:
       - backend-net
 
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: websocket-chat-server
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_SSLMODE: disable
+      HTTP_ADDRESS: 0.0.0.0:8080
+      ENV: dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend-net
+    volumes:
+      - .:/app
+
 volumes:
   pgdata:
 

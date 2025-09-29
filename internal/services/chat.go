@@ -28,9 +28,7 @@ func HandleConnections(cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"error": "Missing or invalid Authorization header"}`))
+			writeJSONError(w, http.StatusUnauthorized, "Missing or invalid Authorization header")
 			return
 		}
 
@@ -39,7 +37,7 @@ func HandleConnections(cfg *config.Config) http.HandlerFunc {
 		// Validate the token
 		claims, err := utils.ValidateToken(tokenString, &cfg.JWT)
 		if err != nil {
-			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			writeJSONError(w, http.StatusUnauthorized, "Invalid or expired token")
 			return
 		}
 
@@ -52,7 +50,7 @@ func HandleConnections(cfg *config.Config) http.HandlerFunc {
 
 		email, ok := claims["email"].(string)
 		if !ok || email == "" {
-			http.Error(w, "email not found in token", http.StatusUnauthorized)
+			writeJSONError(w, http.StatusUnauthorized, "email not found in token")
 			return
 		}
 		clientsMu.Lock()

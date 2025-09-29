@@ -21,18 +21,18 @@ func UserSignUp(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.SignupRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "Invalid request body")
 			return
 		}
 
 		// Require either email or phone
 		if req.Email == "" && req.Phone == "" {
-			http.Error(w, "Email or phone is required", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "Email or phone is required")
 			return
 		}
 
 		if req.Password == "" {
-			http.Error(w, "Password is required", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "Password is required")
 			return
 		}
 
@@ -43,18 +43,18 @@ func UserSignUp(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		// Check uniqueness
 		var existing models.User
 		if req.Email != "" && db.Where("email = ?", req.Email).First(&existing).Error == nil {
-			http.Error(w, "User with this email already exists", http.StatusConflict)
+			writeJSONError(w, http.StatusConflict, "User with this email already exists")
 			return
 		}
 		if req.Phone != "" && db.Where("phone = ?", req.Phone).First(&existing).Error == nil {
-			http.Error(w, "User with this phone already exists", http.StatusConflict)
+			writeJSONError(w, http.StatusConflict, "User with this phone already exists")
 			return
 		}
 
 		// Hash password
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			http.Error(w, "Error creating user", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "Error creating user")
 			return
 		}
 
@@ -67,17 +67,21 @@ func UserSignUp(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 		}
 
 		if err := db.Create(&user).Error; err != nil {
-			http.Error(w, "Failed to save user", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "Failed to save user")
 			return
 		}
 
 		// Generate JWT using passed config (avoid reloading config per request)
-		token, _ := auth.GenerateToken(
+		token, err := auth.GenerateToken(
 			strconv.FormatUint(uint64(user.ID), 10),
 			user.Email,
 			time.Hour*24,
 			&cfg.JWT,
 		)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Failed to generate token")
+			return
+		}
 
 		res := types.SignupResponse{
 			ID:    user.ID,
@@ -86,8 +90,7 @@ func UserSignUp(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			Token: token,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(res)
+		writeJSON(w, res)
 	}
 }
 
@@ -96,12 +99,12 @@ func UserLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req types.LoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "Invalid request body")
 			return
 		}
 
 		if req.Password == "" || (strings.TrimSpace(req.Email) == "" && strings.TrimSpace(req.Phone) == "") {
-			http.Error(w, "Email or phone and password are required", http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "Email or phone and password are required")
 			return
 		}
 
@@ -116,12 +119,12 @@ func UserLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			err = db.Where("phone = ?", req.Phone).First(&user).Error
 		}
 		if err != nil {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			writeJSONError(w, http.StatusUnauthorized, "Invalid credentials")
 			return
 		}
 
 		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)) != nil {
-			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			writeJSONError(w, http.StatusUnauthorized, "Invalid credentials")
 			return
 		}
 
@@ -132,7 +135,7 @@ func UserLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			&cfg.JWT,
 		)
 		if err != nil {
-			http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "Failed to generate token")
 			return
 		}
 
@@ -143,7 +146,6 @@ func UserLogin(db *gorm.DB, cfg *config.Config) http.HandlerFunc {
 			Token: token,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(res)
+		writeJSON(w, res)
 	}
 }

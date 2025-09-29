@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,8 @@ import (
 	"websocket-chat/internal/services"
 	"websocket-chat/internal/types"
 	"websocket-chat/internal/utils"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -30,15 +33,22 @@ func main() {
 		return
 	}
 
-	http.HandleFunc("/ws", services.HandleConnections(cfg))
-	http.HandleFunc("/signUp", services.UserSignUp(db, cfg))
-	http.HandleFunc("/login", services.UserLogin(db, cfg))
+	r := mux.NewRouter()
+	r.HandleFunc("/ws", services.HandleConnections(cfg)).Methods(http.MethodGet)
+	r.HandleFunc("/signup", services.UserSignUp(db, cfg)).Methods(http.MethodPost)
+	r.HandleFunc("/login", services.UserLogin(db, cfg)).Methods(http.MethodPost)
+	r.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]string{"status": "ok"},
+		})
+	}).Methods(http.MethodGet)
 
 	go services.HandleMessages()
 
 	srv := &http.Server{
 		Addr:    ":8080",
-		Handler: middleware.RateLimit(http.DefaultServeMux),
+		Handler: middleware.RateLimit(r),
 	}
 
 	// Start server in background
